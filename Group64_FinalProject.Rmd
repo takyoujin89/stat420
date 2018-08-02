@@ -1,0 +1,188 @@
+---
+title: "Stat 420 - Final Project --  Housing Price Estimation"
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Group 64
+* Balaji Gopalan, balajig2@illinois.edu
+* Chetan Kumar Bhatt, ckbhatt2@illinois.edu
+* Nicholas Devona, devona2@illinois.edu
+* Sonia Gerstenfield, soniasg2@illinois.edu
+
+### Description of Dataset
+This dataset contains price of 1460 homes with 79 explanatory variables describing (almost) every aspect of residential homes in Ames, Iowa. Including rarey included features such that the height of the basement ceiling or the proximity to an east-west railroad.
+
+### Features
+* **SalePrice** - the property's sale price in dollars. This is the target variable that you're trying to predict.
+* **MSSubClass**: The building class
+* **MSZoning**: The general zoning classification
+* **LotFrontage**: Linear feet of street connected to property
+* **LotArea**: Lot size in square feet
+* **Street**: Type of road access
+* **Alley**: Type of alley access
+* **LotShape**: General shape of property
+* **LandContour**: Flatness of the property
+* **Utilities**: Type of utilities available
+* **LotConfig**: Lot configuration
+* **LandSlope**: Slope of property
+* **Neighborhood**: Physical locations within Ames city limits
+* **Condition1**: Proximity to main road or railroad
+* **Condition2**: Proximity to main road or railroad (if a second is present)
+* **BldgType**: Type of dwelling
+* **HouseStyle**: Style of dwelling
+* **OverallQual**: Overall material and finish quality
+* **OverallCond**: Overall condition rating
+* **YearBuilt**: Original construction date
+* **YearRemodAdd**: Remodel date
+* **RoofStyle**: Type of roof
+* **RoofMatl**: Roof material
+* **Exterior1st**: Exterior covering on house
+* **Exterior2nd**: Exterior covering on house (if more than one material)
+* **MasVnrType**: Masonry veneer type
+* **MasVnrArea**: Masonry veneer area in square feet
+* **ExterQual**: Exterior material quality
+* **ExterCond**: Present condition of the material on the exterior
+* **Foundation**: Type of foundation
+* **BsmtQual**: Height of the basement
+* **BsmtCond**: General condition of the basement
+* **BsmtExposure**: Walkout or garden level basement walls
+* **BsmtFinType1**: Quality of basement finished area
+* **BsmtFinSF1**: Type 1 finished square feet
+* **BsmtFinType2**: Quality of second finished area (if present)
+* **BsmtFinSF2**: Type 2 finished square feet
+* **BsmtUnfSF**: Unfinished square feet of basement area
+* **TotalBsmtSF**: Total square feet of basement area
+* **Heating**: Type of heating
+* **HeatingQC**: Heating quality and condition
+* **CentralAir**: Central air conditioning
+* **Electrical**: Electrical system
+* **1stFlrSF**: First Floor square feet
+* **2ndFlrSF**: Second floor square feet
+* **LowQualFinSF**: Low quality finished square feet (all floors)
+* **GrLivArea**: Above grade (ground) living area square feet
+* **BsmtFullBath**: Basement full bathrooms
+* **BsmtHalfBath**: Basement half bathrooms
+* **FullBath**: Full bathrooms above grade
+* **HalfBath**: Half baths above grade
+* **Bedroom**: Number of bedrooms above basement level
+* **Kitchen**: Number of kitchens
+* **KitchenQual**: Kitchen quality
+* **TotRmsAbvGrd**: Total rooms above grade (does not include bathrooms)
+* **Functional**: Home functionality rating
+* **Fireplaces**: Number of fireplaces
+* **FireplaceQu**: Fireplace quality
+* **GarageType**: Garage location
+* **GarageYrBlt**: Year garage was built
+* **GarageFinish**: Interior finish of the garage
+* **GarageCars**: Size of garage in car capacity
+* **GarageArea**: Size of garage in square feet
+* **GarageQual**: Garage quality
+* **GarageCond**: Garage condition
+* **PavedDrive**: Paved driveway
+* **WoodDeckSF**: Wood deck area in square feet
+* **OpenPorchSF**: Open porch area in square feet
+* **EnclosedPorch**: Enclosed porch area in square feet
+* **3SsnPorch**: Three season porch area in square feet
+* **ScreenPorch**: Screen porch area in square feet
+* **PoolArea**: Pool area in square feet
+* **PoolQC**: Pool quality
+* **Fence**: Fence quality
+* **MiscFeature**: Miscellaneous feature not covered in other categories
+* **MiscVal**: $Value of miscellaneous feature
+* **MoSold**: Month Sold
+* **YrSold**: Year Sold
+* **SaleType**: Type of sale
+* **SaleCondition**: Condition of sale
+
+### Background Information
+The Ames Housing dataset was compiled by Dean De Cock for use in data science education and hosted at Kaggle. It's an incredible alternative for data scientists looking for a modernized and expanded version of the often cited Boston Housing dataset.
+
+### Why this Dataset?
+This dataset consists of a number of numerical and catgorical predictors and is a very good candidate for applying concepts learned throughout the course. Another motivation factor is an ongoing Kaggle competition where we can benchmark predictions obtained by our model against the predictions made by thousands of other models.
+
+### Data Loading
+```{r}
+housing_data = read.csv("housing_data.csv")
+head(housing_data)
+```
+
+
+### Data Inspection
+```{r}
+summary(housing_data)
+```
+
+
+### Data Cleaning
+```{r}
+na_count = sapply(housing_data, function(y) sum(length(which(is.na(y)))))
+na_count[na_count>100]
+
+summary(housing_data[c("LotFrontage", "Alley", "FireplaceQu", "PoolQC", "Fence", "MiscFeature")])
+#, FireplaceQu, PoolQC, Fence, MiscFeature]
+na_data = housing_data[c("LotFrontage", "Alley", "FireplaceQu", "PoolQC", "Fence", "MiscFeature")]
+na_data
+```
+
+```{r}
+myvars <- names(housing_data) %in% c("LotFrontage", "Alley", "FireplaceQu", "PoolQC", "Fence", "MiscFeature") 
+newdata <- housing_data[!myvars]
+newdata = newdata[complete.cases(newdata),]
+newdata
+```
+
+
+### Train and Test Dataset
+```{r}
+
+```
+
+
+### The Big Additive Model
+```{r}
+#model_1 = lm(SalePrice~PoolArea, housing_data)
+model = lm(SalePrice~.,newdata)
+model
+```
+
+### Variable Selection
+```{r}
+model = step(model, trace=0)
+
+#model$xlevels[["Exterior1st"]] <- union(model$xlevels[["Exterior1st"]], levels(test_data$Exterior1st))
+#model$xlevels[["ExterCond"]] <- union(model$xlevels[["ExterCond"]], levels(test_data$ExterCond))
+#model$xlevels[["Foundation"]] <- union(model$xlevels[["Foundation"]], levels(test_data$Foundation))
+#model$xlevels[["Heating"]] <- union(model$xlevels[["Heating"]], levels(test_data$Heating))
+```
+
+```{r}
+model
+```
+
+### Prediction for Test Dataset
+
+### Performance of Additive Model
+
+### Inclusion of Interactive Terms
+
+### Variable Selection
+
+### Prediction for Test Dataset with Interactive Model
+
+### Performance of Interactive Model
+
+### Check for LINE Assumptions
+
+### Try Predictor and/or Response Transformation
+
+### Prediction for Test Dataset with Transformed Model
+
+### Performance of Transformed Model
+
+### Final Model
+
+### Conclusion
