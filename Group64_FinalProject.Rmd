@@ -182,7 +182,7 @@ sum(vif(selected_additive_model_bic)>5)
 
 ```{r}
 library(leaps)
-all_housing_add_mod = summary(regsubsets(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea, data = housing_trn_data, really.big=T,nvmax = 10))
+all_housing_add_mod = summary(regsubsets(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea, data = housing_trn_data, really.big=T,nvmax = 5))
 all_housing_add_mod
 ```
 
@@ -202,11 +202,95 @@ extractAIC(selected_additive_model_aic)
 ```
 
 ### Checkking Assumptions of Additive Model
+**Fitted vs Residual Plot**
+```{r}
+#plot(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea, data = housing_trn_data, col = "grey", pch = 20, main = "Data from Model 1")
+  selected_additive_model = lm(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea, data = housing_trn_data)
+plot(fitted(selected_additive_model_bic), resid(selected_additive_model_bic), col = "grey", pch = 20,
+xlab = "Fitted", ylab = "Residuals", main = "Data from Model 1")
+abline(h = 0, col = "darkorange", lwd = 2)
+```
+
+**Q-Q Plot**
+```{r}
+qqnorm(resid(selected_additive_model_bic), main = "Normal Q-Q Plot, fit_1", col = "darkgrey")
+qqline(resid(selected_additive_model_bic), col = "dodgerblue", lwd = 2)
+```
+
+```{r}
+hist(resid(selected_additive_model_bic),
+xlab = "Residuals",
+main = "Histogram of Residuals, fit_1",
+col = "darkorange",
+border = "dodgerblue",
+breaks = 20)
+```
+
+
+```{r warning=FALSE}
+shapiro.test(resid(selected_additive_model_bic))
+library(lmtest)
+bptest(selected_additive_model_bic)
+```
+
+### Unusual Observations
+*Observation with Leverage*
+```{r}
+#hatvalues(selected_additive_model_bic) > 2 * mean(hatvalues(selected_additive_model_bic))
+sum(hatvalues(selected_additive_model_bic) > 2 * mean(hatvalues(selected_additive_model_bic)))
+```
+
+*Outliers*
+```{r}
+rstandard(selected_additive_model_bic)[abs(rstandard(selected_additive_model_bic)) > 2]
+```
+
+**Influence**
+```{r}
+#cooks.distance(selected_additive_model_bic) > 4 / length(cooks.distance(selected_additive_model_bic))
+sum(cooks.distance(selected_additive_model_bic) > 4 / length(cooks.distance(selected_additive_model_bic)), na.rm = TRUE)
+```
+
+**Fix by Exluding Influencial Points**
+```{r}
+big_mod_cd = cooks.distance(selected_additive_model_bic)
+selected_additive_model_bic_fix = lm(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea,
+data = housing_trn_data, subset = big_mod_cd < 4 / length(big_mod_cd))
+qqnorm(resid(selected_additive_model_bic_fix), col = "grey")
+qqline(resid(selected_additive_model_bic_fix), col = "dodgerblue", lwd = 2)
+shapiro.test(resid(selected_additive_model_bic_fix))
+library(lmtest)
+bptest(selected_additive_model_bic_fix)
+#rstandard(selected_additive_model_bic_fix)[abs(rstandard(selected_additive_model_bic_fix)) > 2]
+
+```
+```{r}
+
+```
 
 
 ### Prediction for Test Dataset
+```{r}
+selected_additive_model_bic_fix$xlevels[["Neighborhood"]] <- union(selected_additive_model_bic_fix$xlevels[["Neighborhood"]], levels(housing_tst_data$Neighborhood))
+selected_additive_model_bic_fix$xlevels[["Condition2"]] <- union(selected_additive_model_bic_fix$xlevels[["Condition2"]], levels(housing_tst_data$Condition2))
+selected_additive_model_bic_fix$xlevels[["RoofMatl"]] <- union(selected_additive_model_bic_fix$xlevels[["RoofMatl"]], levels(housing_tst_data$RoofMatl))
+selected_additive_model_bic_fix$xlevels[["ExterQual"]] <- union(selected_additive_model_bic_fix$xlevels[["ExterQual"]], levels(housing_tst_data$ExterQual))
+selected_additive_model_bic_fix$xlevels[["Functional"]] <- union(selected_additive_model_bic_fix$xlevels[["Functional"]], levels(housing_tst_data$Functional))
+#selected_additive_model_bic_fix$xlevels[["ExterQual"]] <- union(selected_additive_model_bic_fix$xlevels[["ExterQual"]], levels(housing_tst_data$ExterQual))
+#selected_additive_model_bic_fix$xlevels[["ExterQual"]] <- union(selected_additive_model_bic_fix$xlevels[["ExterQual"]], levels(housing_tst_data$ExterQual))
+predictions = predict(selected_additive_model_bic_fix, housing_tst_data)
+```
 
 ### Performance of Additive Model
+```{r}
+rmse(housing_trn_data$SalePrice, predict(selected_additive_model_bic_fix, housing_trn_data))
+rmse(housing_tst_data$SalePrice, predictions)
+
+calc_loocv_rmse = function(model) {
+  sqrt(mean((resid(model) / (1 - hatvalues(model))) ^ 2))
+}
+rmse(housing_trn_data$SalePrice, predict(selected_additive_model, housing_trn_data))
+```
 
 ### Inclusion of Interactive Terms
 
