@@ -106,62 +106,103 @@ This dataset consists of a number of numerical and catgorical predictors and is 
 
 ### Data Loading
 ```{r}
-housing_data = read.csv("housing_data.csv")
-head(housing_data)
+original_housing_data = read.csv("housing_data.csv")
+head(original_housing_data)
 ```
 
 
 ### Data Inspection
 ```{r}
-summary(housing_data)
+summary(original_housing_data)
 ```
 
 
 ### Data Cleaning
+As shown above, some of the features in our dataset has a lot of NA values. For example **Alley** has 1369 **NA**. These NA will give errors while training models.
+We are dealing with NA values using following two fold approach:
+* We drop the feature if it has more than 100 NA.
+* Then from the remaining records we drop those for which value of any of the feature is NA.
 ```{r}
-na_count = sapply(housing_data, function(y) sum(length(which(is.na(y)))))
-na_count[na_count>100]
+# Drop the feature if it has more than 100 NA
+na_count = sapply(original_housing_data, function(y) sum(length(which(is.na(y)))))
+significant_na = na_count[na_count>100]
+summary(original_housing_data[names(significant_na)])
+exclude_columns = names(original_housing_data) %in% names(significant_na) 
+housing_data = original_housing_data[!exclude_columns]
 
-summary(housing_data[c("LotFrontage", "Alley", "FireplaceQu", "PoolQC", "Fence", "MiscFeature")])
-#, FireplaceQu, PoolQC, Fence, MiscFeature]
-na_data = housing_data[c("LotFrontage", "Alley", "FireplaceQu", "PoolQC", "Fence", "MiscFeature")]
-na_data
+# Drop those for which value of any of the feature is NA.
+housing_data = housing_data[complete.cases(housing_data),]
 ```
 
 ```{r}
-myvars <- names(housing_data) %in% c("LotFrontage", "Alley", "FireplaceQu", "PoolQC", "Fence", "MiscFeature") 
-newdata <- housing_data[!myvars]
-newdata = newdata[complete.cases(newdata),]
-newdata
+table_data = rbind(c("Original Dataset", dim(original_housing_data)[1], dim(original_housing_data)[2]), c("Dataset after Cleanup", dim(housing_data)[1], dim(housing_data)[2]))
+knitr::kable(table_data,format = "markdown",  row.names = FALSE, col.names = c("","# of Records", "# of Features"), align = 'c', caption = "Data Cleanup Results", escape = FALSE)
 ```
-
 
 ### Train and Test Dataset
 ```{r}
-
+set.seed(42)
+trn_idx = sample(nrow(housing_data), 800)
+housing_trn_data = housing_data[trn_idx, ]
+housing_tst_data = housing_data[-trn_idx, ]
 ```
-
 
 ### The Big Additive Model
 ```{r}
-#model_1 = lm(SalePrice~PoolArea, housing_data)
-model = lm(SalePrice~.,newdata)
-model
+housing_additive_big_model = lm(SalePrice~.,housing_trn_data)
+summary(housing_additive_big_model)
 ```
 
 ### Variable Selection
-```{r}
-model = step(model, trace=0)
+```{r warning=FALSE}
+library(faraway)
+length(summary(housing_additive_big_model)$coeff)
+sum(vif(housing_additive_big_model)>5)
+
+#model = step(model, trace=0)
 
 #model$xlevels[["Exterior1st"]] <- union(model$xlevels[["Exterior1st"]], levels(test_data$Exterior1st))
 #model$xlevels[["ExterCond"]] <- union(model$xlevels[["ExterCond"]], levels(test_data$ExterCond))
 #model$xlevels[["Foundation"]] <- union(model$xlevels[["Foundation"]], levels(test_data$Foundation))
 #model$xlevels[["Heating"]] <- union(model$xlevels[["Heating"]], levels(test_data$Heating))
 ```
+```{r warning=FALSE}
+selected_additive_model_aic = step(housing_additive_big_model, direction = "backward", trace=0)
+selected_additive_model_aic
+length(summary(selected_additive_model_aic)$coeff)
+sum(vif(selected_additive_model_aic)>5)
+```
+
+```{r warning=FALSE}
+selected_additive_model_bic = step(housing_additive_big_model, direction = "backward", k = log(n), trace=0)
+selected_additive_model_bic
+length(summary(selected_additive_model_bic)$coeff)
+sum(vif(selected_additive_model_bic)>5)
+```
 
 ```{r}
-model
+library(leaps)
+all_housing_add_mod = summary(regsubsets(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea, data = housing_trn_data, really.big=T,nvmax = 10))
+all_housing_add_mod
 ```
+
+```{r}
+all_housing_add_mod$rss
+all_housing_add_mod$adjr2
+best_r2_ind = which.max(all_housing_add_mod$adjr2)
+all_housing_add_mod$which[best_r2_ind, ]
+housing_additive_heruristic_model = lm(SalePrice~Condition2+OverallQual+X1stFlrSF+X2ndFlrSF+GarageCars, housing_trn_data)
+summary(housing_additive_heruristic_model)
+```
+
+
+```{r}
+extractAIC(housing_additive_heruristic_model)
+extractAIC(selected_additive_model_aic)
+```
+
+### Checkking Assumptions of Additive Model
+
 
 ### Prediction for Test Dataset
 
