@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 * Nicholas Devona, devona2@illinois.edu
 * Sonia Gerstenfield, soniasg2@illinois.edu
 
+## Introduction
+
 ### Description of Dataset
 This dataset contains price of 1460 homes with 79 explanatory variables describing (almost) every aspect of residential homes in Ames, Iowa. Including rarey included features such that the height of the basement ceiling or the proximity to an east-west railroad.
 
@@ -147,75 +149,78 @@ housing_trn_data = housing_data[trn_idx, ]
 housing_tst_data = housing_data[-trn_idx, ]
 ```
 
+### Linear Relation between Predictor & Response
+There aremany predictor variables, pair plot in next session shows Linear relationship between SalePrice and some of thepredictors. Also the linear relationship between different predictors for example GarageArea and OveralQual suggests that we'll need to treat collinearity later on.
+
+```{r}
+pairs(housing_trn_data[c("SalePrice","LotArea","OverallQual","YearBuilt", "MasVnrArea", "BsmtUnfSF","GarageArea","YearRemodAdd")], col = "dodgerblue")
+```
+
+## Methods
+
 ### The Big Additive Model
+Let's start with biggest possible additive model by including all predictors in our model.
 ```{r}
 housing_additive_big_model = lm(SalePrice~.,housing_trn_data)
-summary(housing_additive_big_model)
+housing_additive_big_model$coefficients
 ```
 
 ### Variable Selection
+Next we calculate the variance inflation factor which quantifies the effect of collinearity on the variance of our regression estimates. We find out that 125 out of 860 predictors has VIF greater than 5 which is cause for concern. 
 ```{r warning=FALSE}
 library(faraway)
 length(summary(housing_additive_big_model)$coeff)
 sum(vif(housing_additive_big_model)>5)
-
-#model = step(model, trace=0)
-
-#model$xlevels[["Exterior1st"]] <- union(model$xlevels[["Exterior1st"]], levels(test_data$Exterior1st))
-#model$xlevels[["ExterCond"]] <- union(model$xlevels[["ExterCond"]], levels(test_data$ExterCond))
-#model$xlevels[["Foundation"]] <- union(model$xlevels[["Foundation"]], levels(test_data$Foundation))
-#model$xlevels[["Heating"]] <- union(model$xlevels[["Heating"]], levels(test_data$Heating))
 ```
+
+We then perform variable selection using backward AIC and backward BIC.
+
 ```{r warning=FALSE}
 selected_additive_model_aic = step(housing_additive_big_model, direction = "backward", trace=0)
-selected_additive_model_aic
 length(summary(selected_additive_model_aic)$coeff)
 sum(vif(selected_additive_model_aic)>5)
 ```
 
 ```{r warning=FALSE}
+n = length(resid(housing_additive_big_model))
 selected_additive_model_bic = step(housing_additive_big_model, direction = "backward", k = log(n), trace=0)
-selected_additive_model_bic
 length(summary(selected_additive_model_bic)$coeff)
 sum(vif(selected_additive_model_bic)>5)
 ```
 
-```{r}
-library(leaps)
-all_housing_add_mod = summary(regsubsets(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea, data = housing_trn_data, really.big=T,nvmax = 5))
-all_housing_add_mod
-```
+We find that model selected using AIC has 508 predictors, 47 still have high VIF and model selected using BIC has 168 predictors and only 15 of them have high VIF, so we choose the model selected using backward BIC for further analysis.
 
 ```{r}
-all_housing_add_mod$rss
-all_housing_add_mod$adjr2
-best_r2_ind = which.max(all_housing_add_mod$adjr2)
-all_housing_add_mod$which[best_r2_ind, ]
-housing_additive_heruristic_model = lm(SalePrice~Condition2+OverallQual+X1stFlrSF+X2ndFlrSF+GarageCars, housing_trn_data)
-summary(housing_additive_heruristic_model)
+summary(selected_additive_model_bic)
 ```
 
 
-```{r}
-extractAIC(housing_additive_heruristic_model)
-extractAIC(selected_additive_model_aic)
-```
-
-### Checkking Assumptions of Additive Model
+### Checking Assumptions of Selected Additive Model
 **Fitted vs Residual Plot**
+First we check for the linearity and constant variance assumptions using Fitted versus Residuals Plot
 ```{r}
-#plot(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea, data = housing_trn_data, col = "grey", pch = 20, main = "Data from Model 1")
-  selected_additive_model = lm(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea, data = housing_trn_data)
 plot(fitted(selected_additive_model_bic), resid(selected_additive_model_bic), col = "grey", pch = 20,
-xlab = "Fitted", ylab = "Residuals", main = "Data from Model 1")
+xlab = "Fitted", ylab = "Residuals", main = "Data from Linear Model")
 abline(h = 0, col = "darkorange", lwd = 2)
 ```
+At first glance plot looks to follow Linearity but looking closely reveals that it might be taking a shape of parabola and also constant variance seems under suspicion, so we perform Breusch-Pagan Test to confirm homoscedasticity.
+
+**Breusch-Pagan Test**
+```{r}
+library(lmtest)
+bptest(selected_additive_model_bic)
+```
+
+As the p-value from test is very small, so we reject the null of homoscedasticity. The constant variance assumption is violated.
 
 **Q-Q Plot**
+Let us test the assumption of normality using QQ plot and histogram.
 ```{r}
 qqnorm(resid(selected_additive_model_bic), main = "Normal Q-Q Plot, fit_1", col = "darkgrey")
 qqline(resid(selected_additive_model_bic), col = "dodgerblue", lwd = 2)
 ```
+
+We have a suspect Q-Q plot. We would probably not believe the errors follow a normal distribution.
 
 ```{r}
 hist(resid(selected_additive_model_bic),
@@ -226,88 +231,174 @@ border = "dodgerblue",
 breaks = 20)
 ```
 
+The histogram is little off from normal distribution, specially towards right of mean. So normality assumtion is under suspicion, we perform Shapiro Wilk test to confirm our suspicion.
 
+**Shapiro-Wilk Normality Test**
+```{r warning=FALSE}
+shapiro.test(resid(selected_additive_model_bic))
+```
+
+
+For a very small p-value indicates we believe there is only a small probability the data could have been sampled from a normal distribution.
+
+### Unusual Observations
+As both constant  variance and normality assumotions are under suspicion, we try to find out unusual observations in following sections.
+
+**Observation with Leverage**
+```{r}
+sum(hatvalues(selected_additive_model_bic) > 2 * mean(hatvalues(selected_additive_model_bic)))
+```
+
+**Outliers**
+```{r}
+length(rstandard(selected_additive_model_bic)[abs(rstandard(selected_additive_model_bic)) > 2])
+```
+
+**Influence**
+```{r}
+sum(cooks.distance(selected_additive_model_bic) > 4 / length(cooks.distance(selected_additive_model_bic)), na.rm = TRUE)
+```
+
+In above subsections we found 49 data points with leverage, 40 outliers and 50 influencing data points falling under unsusual observations.
+
+**Fix by Exluding Influencial Points**
+We found that there are influential points which might be affecting performance of our model so in following sectionwe try to train the  model selected from backward BIC again while excluding the influential data points.
+
+```{r}
+big_mod_cd = cooks.distance(selected_additive_model_bic)
+selected_additive_model_bic_fix = lm(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea,
+data = housing_trn_data, subset = big_mod_cd < 4 / length(big_mod_cd))
+```
+
+We again test for LINE assumptions and see that p-value for both BP and Shapiro-Wilk test are approaching towards significant values, though not there yet but it is indicating that we are on right track.
+
+```{r}
+plot(fitted(selected_additive_model_bic_fix), resid(selected_additive_model_bic_fix), col = "grey", pch = 20,
+xlab = "Fitted", ylab = "Residuals", main = "Data from Model 1")
+abline(h = 0, col = "darkorange", lwd = 2)
+
+qqnorm(resid(selected_additive_model_bic_fix), col = "grey")
+qqline(resid(selected_additive_model_bic_fix), col = "dodgerblue", lwd = 2)
+
+shapiro.test(resid(selected_additive_model_bic_fix))
+
+library(lmtest)
+bptest(selected_additive_model_bic_fix)
+
+rmse = function(actual, predicted) {
+  sqrt(mean((actual - predicted) ^ 2, na.rm = TRUE))
+}
+```
+
+
+### Prediction for Test Dataset using Additive Model
+```{r}
+housing_tst_data$Condition2 = factor(housing_tst_data$Condition2, levels = selected_additive_model_bic_fix$xlevels[["Condition2"]])
+housing_tst_data$RoofMatl = factor(housing_tst_data$RoofMatl, levels = selected_additive_model_bic_fix$xlevels[["RoofMatl"]])
+predictions = predict(selected_additive_model_bic_fix, housing_tst_data)
+rmse(housing_tst_data$SalePrice, predictions)
+
+housing_data_2 = housing_trn_data[as.vector(!cooks.distance(selected_additive_model_bic) > 4 / length(cooks.distance(selected_additive_model_bic))), ]
+rmse(housing_data_2$SalePrice, predict(selected_additive_model_bic_fix, housing_data_2))
+```
+
+### Performance of Additive Model
+
+
+### Try Predictor and/or Response Transformation
+```{r}
+# take the above selected_additive_model_bic with a log transform
+
+log_selected_additive_model_bic = lm(
+  log(SalePrice) ~ LotArea + LandContour + LandSlope +
+  Neighborhood + Condition1 + Condition2 + BldgType + HouseStyle +
+  OverallQual + OverallCond + YearBuilt + RoofStyle + RoofMatl +
+  MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure +
+  BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF +
+  LowQualFinSF + BedroomAbvGr + KitchenAbvGr + KitchenQual +
+  Functional + GarageCars + WoodDeckSF + EnclosedPorch + PoolArea +
+  SaleCondition,
+  data = housing_trn_data
+  )
+plot(fitted(log_selected_additive_model_bic), resid(log_selected_additive_model_bic), col = "grey", pch = 20,
+xlab = "Fitted", ylab = "Residuals", main = "Data from Model 1")
+abline(h = 0, col = "darkorange", lwd = 2)
+```
+
+### Test Line Assumptions
+```{r}
+qqnorm(resid(selected_additive_model_bic), main = "Normal Q-Q Plot, fit_1", col = "darkgrey")
+qqline(resid(selected_additive_model_bic), col = "dodgerblue", lwd = 2)
+```
+
+```{r}
+hist(resid(log_selected_additive_model_bic),
+xlab = "Residuals",
+main = "Histogram of Residuals, fit_1",
+col = "darkorange",
+border = "dodgerblue",
+breaks = 20)
+```
+
+
+### Remove Influential Points
 ```{r warning=FALSE}
 shapiro.test(resid(selected_additive_model_bic))
 library(lmtest)
 bptest(selected_additive_model_bic)
 ```
-
-### Unusual Observations
-*Observation with Leverage*
 ```{r}
-#hatvalues(selected_additive_model_bic) > 2 * mean(hatvalues(selected_additive_model_bic))
-sum(hatvalues(selected_additive_model_bic) > 2 * mean(hatvalues(selected_additive_model_bic)))
-```
+# remove influential points
+sum(cooks.distance(log_selected_additive_model_bic) > 4 / length(cooks.distance(log_selected_additive_model_bic)), na.rm = TRUE)
 
-*Outliers*
-```{r}
-rstandard(selected_additive_model_bic)[abs(rstandard(selected_additive_model_bic)) > 2]
-```
+log_big_mod_cd = cooks.distance(log_selected_additive_model_bic)
+log_selected_additive_model_bic_fix = lm(log(SalePrice) ~ sqrt(LotArea) + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea,
+data = housing_trn_data, subset = log_big_mod_cd < 4 / length(log_big_mod_cd))
 
-**Influence**
-```{r}
-#cooks.distance(selected_additive_model_bic) > 4 / length(cooks.distance(selected_additive_model_bic))
-sum(cooks.distance(selected_additive_model_bic) > 4 / length(cooks.distance(selected_additive_model_bic)), na.rm = TRUE)
-```
+plot(fitted(log_selected_additive_model_bic_fix), resid(log_selected_additive_model_bic_fix), col = "grey", pch = 20,
+xlab = "Fitted", ylab = "Residuals", main = "Data from Model 1")
+abline(h = 0, col = "darkorange", lwd = 2)
 
-**Fix by Exluding Influencial Points**
-```{r}
-big_mod_cd = cooks.distance(selected_additive_model_bic)
-selected_additive_model_bic_fix = lm(SalePrice ~ LotArea + LandSlope + Neighborhood + Condition2 + BldgType + OverallQual + OverallCond + YearBuilt + RoofMatl + MasVnrType + MasVnrArea + ExterQual + BsmtQual + BsmtExposure + BsmtFinSF1 + BsmtFinSF2 + BsmtUnfSF + X1stFlrSF + X2ndFlrSF + BedroomAbvGr + KitchenAbvGr + Functional + GarageCars + PoolArea,
-data = housing_trn_data, subset = big_mod_cd < 4 / length(big_mod_cd))
-qqnorm(resid(selected_additive_model_bic_fix), col = "grey")
-qqline(resid(selected_additive_model_bic_fix), col = "dodgerblue", lwd = 2)
-shapiro.test(resid(selected_additive_model_bic_fix))
+qqnorm(resid(log_selected_additive_model_bic_fix), col = "grey")
+qqline(resid(log_selected_additive_model_bic_fix), col = "dodgerblue", lwd = 2)
+
+shapiro.test(resid(log_selected_additive_model_bic_fix))
+
 library(lmtest)
-bptest(selected_additive_model_bic_fix)
-#rstandard(selected_additive_model_bic_fix)[abs(rstandard(selected_additive_model_bic_fix)) > 2]
+bptest(log_selected_additive_model_bic_fix)
 
 ```
-```{r}
-
-```
-
-
-### Prediction for Test Dataset
-```{r}
-selected_additive_model_bic_fix$xlevels[["Neighborhood"]] <- union(selected_additive_model_bic_fix$xlevels[["Neighborhood"]], levels(housing_tst_data$Neighborhood))
-selected_additive_model_bic_fix$xlevels[["Condition2"]] <- union(selected_additive_model_bic_fix$xlevels[["Condition2"]], levels(housing_tst_data$Condition2))
-selected_additive_model_bic_fix$xlevels[["RoofMatl"]] <- union(selected_additive_model_bic_fix$xlevels[["RoofMatl"]], levels(housing_tst_data$RoofMatl))
-selected_additive_model_bic_fix$xlevels[["ExterQual"]] <- union(selected_additive_model_bic_fix$xlevels[["ExterQual"]], levels(housing_tst_data$ExterQual))
-selected_additive_model_bic_fix$xlevels[["Functional"]] <- union(selected_additive_model_bic_fix$xlevels[["Functional"]], levels(housing_tst_data$Functional))
-#selected_additive_model_bic_fix$xlevels[["ExterQual"]] <- union(selected_additive_model_bic_fix$xlevels[["ExterQual"]], levels(housing_tst_data$ExterQual))
-#selected_additive_model_bic_fix$xlevels[["ExterQual"]] <- union(selected_additive_model_bic_fix$xlevels[["ExterQual"]], levels(housing_tst_data$ExterQual))
-predictions = predict(selected_additive_model_bic_fix, housing_tst_data)
-```
-
-### Performance of Additive Model
-```{r}
-rmse(housing_trn_data$SalePrice, predict(selected_additive_model_bic_fix, housing_trn_data))
-rmse(housing_tst_data$SalePrice, predictions)
-
-calc_loocv_rmse = function(model) {
-  sqrt(mean((resid(model) / (1 - hatvalues(model))) ^ 2))
-}
-rmse(housing_trn_data$SalePrice, predict(selected_additive_model, housing_trn_data))
-```
-
-### Inclusion of Interactive Terms
-
-### Variable Selection
-
-### Prediction for Test Dataset with Interactive Model
-
-### Performance of Interactive Model
-
-### Check for LINE Assumptions
-
-### Try Predictor and/or Response Transformation
 
 ### Prediction for Test Dataset with Transformed Model
+```{r}
+housing_data_1 = housing_trn_data[as.vector(!cooks.distance(log_selected_additive_model_bic) > 4 / length(cooks.distance(log_selected_additive_model_bic))), ]
+trns_train_rmse = rmse(housing_data_1$SalePrice, exp(predict(log_selected_additive_model_bic_fix, housing_data_1)))
+
+housing_tst_data$Neighborhood = factor(housing_tst_data$Neighborhood, levels = log_selected_additive_model_bic_fix$xlevels[["Neighborhood"]])
+housing_tst_data$ExterQual = factor(housing_tst_data$ExterQual, levels = log_selected_additive_model_bic_fix$xlevels[["ExterQual"]])
+housing_tst_data$Functional = factor(housing_tst_data$Functional, levels = log_selected_additive_model_bic_fix$xlevels[["Functional"]])
+predictions = predict(log_selected_additive_model_bic_fix, housing_tst_data)
+trns_test_rmse = rmse(housing_tst_data$SalePrice, exp(predictions))
+```
+Train RMSE for Transformed Model = `r trns_train_rmse`
+Test RMSE for Transformed Model = `r trns_test_rmse`
 
 ### Performance of Transformed Model
+We see that the transformed model alone does not pass a BP or Shapiro test. However, when we remove the influential values, the QQ-plot and fitted vs. residuals seem to follow all LINE assumptions which is also veified in BP and Shapiro test.
 
-### Final Model
+## Results
+So the final model that we have selected for the given dataset is
+```{r}
+summary(log_selected_additive_model_bic_fix)
+```
 
-### Conclusion
+## Discussion
+Lets summarize what we did, we started with a dataset with a number of invalid values and a large number of predictors. We cleaned dataset to remove NA values and split it to train and test datasets. Then we started with the largest possible additive model and reduced number of predictors using backward selection and AIC. We tested resulting model for LINE assumptions for linear regression and found that those assumptions are violated. Then we derived another model using predictor and response tranformation and train it on a dataset that excludes infuential data points. We tested this new model for LINE assumptions and found it was in line with these assumptions, finally we used test dataset for prediction and calculated train and test RMSE. Of course this model is still not the best possible model but can be used for some prediction and can be further iproved by applying further transformations.
+
+The final selected model uses both numerical and categorical predictors. Some of the notable predictors that become part of selected model are area of lot, neighbourhood, overall quality, in-law unit above garage, no of car parkings, pool area, year built etc. Clearly these all play a major role for determining sales price of a home. So we can conclude that selected model is in line with the practical considerations of housing market.
+
+Some of the discussion points are inline with code/graphics so that we can clearly refer to context.
+
+We also tried using interactive predictiors but with such a large number of predictors where many of them are categorical, the number of predictors were going very high and keeping R studio busy for hours. In future we would like to run R studio in more powerfull machine and explore areas of multithreaded processing to speed up training the model and submit result on Kaggle competition to see where we stand.
+
+## Conclusion
